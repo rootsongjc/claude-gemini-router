@@ -173,13 +173,49 @@ claude-gemini-router 作为一个转换层，具有以下功能：
 
 ## 模型选择
 
-**claude-gemini-router 支持两种有效的方法来选择要使用的 Gemini 模型：**
+**claude-gemini-router 支持灵活的模型选择，优先级顺序如下：**
 
-1. **Cloudflare Worker 环境变量**：可以在 `wrangler.toml` 配置文件的 `[vars]` 部分或作为 Cloudflare 机密设置 `GEMINI_MODEL` 环境变量。此变量旨在作为后备默认模型，尽管当前实现主要依赖于下面的自动映射机制。
+1. **请求模型参数**（最高优先级）：API 请求中的 `model` 字段具有最高优先级。您可以直接指定任何有效的 Gemini 模型名称：
 
-2. **自动模型映射**：`mapModelToGemini()` 函数自动将客户端发送的 Anthropic 模型名称转换为相应的 Gemini 模型等效项。当客户端发送包含 "haiku"、"sonnet" 或 "opus" 的模型名称时，路由器会智能地将它们映射到相应的 Gemini 模型（"haiku" 映射到 "gemini-2.5-flash"，"sonnet/opus" 映射到 "gemini-2.5-pro"）。如果模型名称已经包含正斜杠，则会原样传递。对于无法识别的模型，默认使用 "gemini-2.5-flash"。
+   ```bash
+   curl -X POST https://cgr.jimmysong.io/v1/messages \
+     -H "Content-Type: application/json" \
+     -H "x-api-key: $GEMINI_API_KEY" \
+     -d '{
+       "model": "gemini-1.5-flash",
+       "messages": [{"role": "user", "content": "你好！"}]
+     }'
+   ```
 
-**重要提示**：客户端的 `ANTHROPIC_MODEL` 环境变量对 Worker 内部的模型选择**没有服务器端影响**。虽然它可能被客户端应用程序（如 Claude Code）用来指定在请求中发送的模型名称，但实际的模型选择完全由服务器端的 `mapModelToGemini()` 函数处理。不应将此客户端变量宣传为控制服务器端模型选择的方式，因为它对 Worker 的行为没有影响。
+2. **环境变量后备**：如果请求中没有指定模型，则使用 `GEMINI_MODEL` 环境变量作为后备默认值。
+
+3. **系统默认**：如果两者都没有指定，则默认使用 `gemini-2.5-flash`。
+
+### 模型名称处理
+
+路由器智能处理 Anthropic 和 Gemini 模型名称：
+
+- **直接 Gemini 模型**：以 `gemini-` 开头的名称将按原样使用（例如 `gemini-1.5-flash`、`gemini-2.5-pro`）
+- **Anthropic 模型映射**：Anthropic 模型名称自动映射：
+  - `haiku` → `gemini-2.5-flash`
+  - `sonnet` → `gemini-2.5-pro`
+  - `opus` → `gemini-2.5-pro`
+- **未知模型**：默认使用 `gemini-2.5-flash`
+
+### 响应模型字段
+
+API 响应现在正确包含 `model` 字段，显示实际使用的模型：
+
+```json
+{
+  "id": "msg_1234567890",
+  "type": "message",
+  "role": "assistant",
+  "content": [{"type": "text", "text": "你好！"}],
+  "model": "gemini-1.5-flash",
+  "usage": {"input_tokens": 4, "output_tokens": 8}
+}
+```
 
 ## API 使用
 

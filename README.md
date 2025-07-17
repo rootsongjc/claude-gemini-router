@@ -173,13 +173,48 @@ This allows you to use [Claude Code](https://claude.ai/code) with Google's Gemin
 
 ## Model Selection
 
-**The claude-gemini-router supports two valid methods for selecting the Gemini model to use:**
+**The claude-gemini-router supports flexible model selection with the following priority order:**
 
-1. **Cloudflare Worker Environment Variable**: The `GEMINI_MODEL` environment variable can be set in your `wrangler.toml` configuration file under the `[vars]` section or as a Cloudflare secret. This variable is intended to serve as a fallback default model, though the current implementation primarily relies on the automatic mapping mechanism below.
+1. **Request Model Parameter** (Highest Priority): The `model` field in the API request takes precedence. You can specify any valid Gemini model name directly:
+   ```bash
+   curl -X POST https://cgr.jimmysong.io/v1/messages \
+     -H "Content-Type: application/json" \
+     -H "x-api-key: $GEMINI_API_KEY" \
+     -d '{
+       "model": "gemini-1.5-flash",
+       "messages": [{"role": "user", "content": "Hello!"}]
+     }'
+   ```
 
-2. **Automatic Model Mapping**: The `mapModelToGemini()` function automatically translates Anthropic model names sent by the client into appropriate Gemini model equivalents. When a client sends model names containing "haiku", "sonnet", or "opus", the router intelligently maps them to corresponding Gemini models ("gemini-2.5-flash" for haiku, "gemini-2.5-pro" for sonnet/opus). If the model name already contains a forward slash, it's passed through unchanged. For unrecognized models, it defaults to "gemini-2.5-flash".
+2. **Environment Variable Fallback**: If no model is specified in the request, the `GEMINI_MODEL` environment variable is used as a fallback default.
 
-**Important**: The client-side `ANTHROPIC_MODEL` environment variable has **no server-side effect** on model selection within the worker itself. While it may be used by client applications (like Claude Code) to specify which model name to send in requests, the actual model selection is handled exclusively by the server-side `mapModelToGemini()` function. This client-side variable should not be advertised as a way to control server-side model selection, as it has no impact on the worker's behavior.
+3. **System Default**: If neither is specified, defaults to `gemini-2.5-flash`.
+
+### Model Name Handling
+
+The router intelligently handles both Anthropic and Gemini model names:
+
+- **Direct Gemini Models**: Names starting with `gemini-` are used as-is (e.g., `gemini-1.5-flash`, `gemini-2.5-pro`)
+- **Anthropic Model Mapping**: Anthropic model names are automatically mapped:
+  - `haiku` → `gemini-2.5-flash`
+  - `sonnet` → `gemini-2.5-pro`
+  - `opus` → `gemini-2.5-pro`
+- **Unknown Models**: Default to `gemini-2.5-flash`
+
+### Response Model Field
+
+The API response now correctly includes the `model` field showing which model was actually used:
+
+```json
+{
+  "id": "msg_1234567890",
+  "type": "message",
+  "role": "assistant",
+  "content": [{"type": "text", "text": "Hello!"}],
+  "model": "gemini-1.5-flash",
+  "usage": {"input_tokens": 4, "output_tokens": 8}
+}
+```
 
 ## API Usage
 

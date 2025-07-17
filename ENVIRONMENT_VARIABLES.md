@@ -16,8 +16,8 @@ This document describes the environment variables used by claude-gemini-router.
 
 ## Optional Variables
 
-### GEMINI_MODEL (Primary Model Configuration)
-- **Description**: **This is the primary way to configure which Gemini model the router uses.** Default Gemini model to use when no model is specified in requests
+### GEMINI_MODEL (Model Selection Fallback)
+- **Description**: Default model to use when no model is specified in requests. Acts as a fallback.
 - **Required**: No
 - **Type**: String
 - **Default**: `gemini-2.5-flash`
@@ -26,7 +26,8 @@ This document describes the environment variables used by claude-gemini-router.
   - `gemini-2.5-pro` - High-performance model
   - `gemini-1.5-flash` - Fast model
 - **Configuration**: Set in `wrangler.toml` under `[vars]` section
-- **Important**: This worker-side configuration controls model selection, not local shell environment variables
+- **Notes**: Request `model` parameter takes precedence. This configuration serves as a fallback.
+- **Important**: This worker-side configuration controls model selection along with request parameters, not local shell environment variables.
 
 ## Configuration Methods
 
@@ -80,11 +81,19 @@ When using claude-gemini-router with Claude Code, configure these environment va
 - **Example**: `AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 - **Configuration**: Set in your shell config (`~/.bashrc` or `~/.zshrc`)
 
-### Model Selection
+### Model Selection Priority
 
-**Important**: Model selection is controlled by the `GEMINI_MODEL` environment variable on the worker side (configured in `wrangler.toml`). Local shell environment variables like `ANTHROPIC_MODEL` do not affect which model is used - they are ignored by the claude-gemini-router.
+**The router uses the following priority order for model selection:**
 
-To change the model used by the router, update the `GEMINI_MODEL` variable in your worker configuration (see the "Optional Variables" section above).
+1. **Request Model Parameter** (Highest Priority): The `model` field in API requests
+2. **Environment Variable Fallback**: The `GEMINI_MODEL` worker environment variable (configured in `wrangler.toml`)
+3. **System Default**: `gemini-2.5-flash` if neither is specified
+
+**Important**: Local shell environment variables like `ANTHROPIC_MODEL` do not affect which model is used - they are ignored by the claude-gemini-router. The router prioritizes the `model` field in requests over worker environment variables.
+
+To use a specific model, either:
+- Specify it in the request: `{"model": "gemini-1.5-flash"}`
+- Set the `GEMINI_MODEL` variable in your worker configuration as a fallback default
 
 ## Example Configurations
 
