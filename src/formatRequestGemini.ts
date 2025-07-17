@@ -266,7 +266,7 @@ function convertMessagesToGeminiContents(messages: any[], systemPrompt?: string)
 /**
  * Converts Anthropic Claude /v1/messages request to Gemini generateContent format
  */
-export function formatAnthropicToGemini(body: MessageCreateParamsBase): {
+export function formatAnthropicToGemini(body: MessageCreateParamsBase, env?: { GEMINI_MODEL?: string }): {
   request: GeminiRequest;
   isStream: boolean;
   model: string;
@@ -306,10 +306,13 @@ export function formatAnthropicToGemini(body: MessageCreateParamsBase): {
     geminiRequest.tools = [];
   }
 
+  // Use environment variable model if available, otherwise use request model
+  const selectedModel = env?.GEMINI_MODEL || model;
+
   return {
     request: geminiRequest,
     isStream: stream || false,
-    model: mapModelToGemini(model)
+    model: mapModelToGemini(selectedModel)
   };
 }
 

@@ -150,7 +150,7 @@ export ANTHROPIC_MODEL="gemini-2.5-flash" # Optional, specify your preferred Gem
         request: geminiRequest,
         isStream,
         model,
-      } = formatAnthropicToGemini(body);
+      } = formatAnthropicToGemini(body, env);
 
       // Get the appropriate Gemini endpoint
       const endpoint = getGeminiEndpoint(model, isStream);
@@ -198,7 +198,7 @@ export ANTHROPIC_MODEL="gemini-2.5-flash" # Optional, specify your preferred Gem
 
       // Handle streaming response
       if (isStream) {
-        const stream = streamGeminiToAnthropic(geminiResponse);
+        const stream = streamGeminiToAnthropic(geminiResponse.body!, model);
         return new Response(stream, {
           headers: {
             "Content-Type": "text/event-stream",
@@ -213,7 +213,7 @@ export ANTHROPIC_MODEL="gemini-2.5-flash" # Optional, specify your preferred Gem
       const geminiData = await geminiResponse.json();
       logger.debug("Gemini response:", geminiData);
 
-      const anthropicResponse = formatGeminiToAnthropic(geminiData);
+      const anthropicResponse = formatGeminiToAnthropic(geminiData, model);
       logger.debug("Converted to Anthropic response:", anthropicResponse);
 
       return new Response(JSON.stringify(anthropicResponse), {
