@@ -28,13 +28,6 @@ export ANTHROPIC_BASE_URL="https://cgr.jimmysong.io"
 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
 ```
 
-**可选：** 配置特定模型：
-
-```bash
-export ANTHROPIC_MODEL="gemini-2.5-pro"
-export ANTHROPIC_SMALL_FAST_MODEL="gemini-2.5-flash"
-```
-
 **第 4 步：** 重新加载您的 shell 并运行 Claude Code：
 
 ```bash
@@ -46,15 +39,69 @@ claude
 
 ### 多种配置
 
-要为不同的提供商或模型维护多个 Claude Code 配置，请使用 shell 别名：
+要为不同的提供商维护多个 Claude Code 配置，请使用 shell 别名：
 
 ```bash
 # 不同配置的示例别名
-alias c1='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" ANTHROPIC_MODEL="gemini-2.5-flash" claude'
-alias c2='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
+alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-official='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
 ```
 
-将这些别名添加到您的 shell 配置文件（`~/.bashrc` 或 `~/.zshrc`）中，然后使用 `c1` 或 `c2` 在配置之间切换。
+将这些别名添加到您的 shell 配置文件（`~/.bashrc` 或 `~/.zshrc`）中，然后使用 `claude-gemini` 或 `claude-official` 在配置之间切换。
+
+#### 使用不同的 Worker 部署来支持不同模型
+
+要使用不同的 Gemini 模型，请部署不同的 Worker 而不是依赖 shell 变量：
+
+**选项 1：多个 Worker 部署**
+
+```bash
+# 为快速模型部署 worker
+wrangler deploy --name claude-gemini-fast
+wrangler secret put GEMINI_API_KEY --name claude-gemini-fast
+
+# 为专业模型部署 worker
+wrangler deploy --name claude-gemini-pro
+wrangler secret put GEMINI_API_KEY --name claude-gemini-pro
+```
+
+然后配置不同的 `wrangler.toml` 文件或使用特定环境配置：
+
+```toml
+# 对于快速 worker
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# 对于专业 worker
+[vars]
+GEMINI_MODEL = "gemini-2.5-pro"
+```
+
+**选项 2：基于环境的部署**
+
+```bash
+# 部署到不同环境
+wrangler deploy --env fast
+wrangler deploy --env pro
+```
+
+使用相应的 `wrangler.toml` 配置：
+
+```toml
+[env.fast.vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[env.pro.vars]
+GEMINI_MODEL = "gemini-2.5-pro"
+```
+
+然后使用别名指向不同的部署：
+
+```bash
+# 不同模型部署的别名
+alias claude-fast='ANTHROPIC_BASE_URL="https://claude-gemini-fast.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-pro='ANTHROPIC_BASE_URL="https://claude-gemini-pro.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+```
 
 ## GitHub Actions 使用
 
@@ -118,18 +165,21 @@ claude-gemini-router 作为一个转换层，具有以下功能：
 
 ## 支持的模型
 
-## 免费额度限制
+| 模型名称 | 描述 |
+|----------|------|
+| `gemini-2.5-flash` | 最新快速模型（默认） |
+| `gemini-2.5-pro` | 高性能模型 |
+| `gemini-1.5-flash` | 快速模型 |
 
-| 模型 | 每分钟请求数 (RPM) | 每分钟令牌数 (TPM) | 每天请求数 (RPD) |
-|------|-------------------|-------------------|-----------------|
-| **文本输出模型** |
-| `gemini-2.5-pro` | 5 | 250,000 | 100 |
-| `gemini-2.5-flash` | 10 | 250,000 | 250 |
-| `gemini-2.5-flash-lite` | 15 | 250,000 | 1,000 |
-| `gemini-2.0-flash` | 15 | 1,000,000 | 200 |
-| `gemini-2.0-flash-lite` | 30 | 1,000,000 | 200 |
+## 模型选择
 
-> 以上为 Google Gemini API 免费层级的使用限制，详情请参阅[官方文档](https://ai.google.dev/gemini-api/docs/rate-limits?utm_source=chatgpt.com#free-tier)
+**claude-gemini-router 支持两种有效的方法来选择要使用的 Gemini 模型：**
+
+1. **Cloudflare Worker 环境变量**：可以在 `wrangler.toml` 配置文件的 `[vars]` 部分或作为 Cloudflare 机密设置 `GEMINI_MODEL` 环境变量。此变量旨在作为后备默认模型，尽管当前实现主要依赖于下面的自动映射机制。
+
+2. **自动模型映射**：`mapModelToGemini()` 函数自动将客户端发送的 Anthropic 模型名称转换为相应的 Gemini 模型等效项。当客户端发送包含 "haiku"、"sonnet" 或 "opus" 的模型名称时，路由器会智能地将它们映射到相应的 Gemini 模型（"haiku" 映射到 "gemini-2.5-flash"，"sonnet/opus" 映射到 "gemini-2.5-pro"）。如果模型名称已经包含正斜杠，则会原样传递。对于无法识别的模型，默认使用 "gemini-2.5-flash"。
+
+**重要提示**：客户端的 `ANTHROPIC_MODEL` 环境变量对 Worker 内部的模型选择**没有服务器端影响**。虽然它可能被客户端应用程序（如 Claude Code）用来指定在请求中发送的模型名称，但实际的模型选择完全由服务器端的 `mapModelToGemini()` 函数处理。不应将此客户端变量宣传为控制服务器端模型选择的方式，因为它对 Worker 的行为没有影响。
 
 ## API 使用
 

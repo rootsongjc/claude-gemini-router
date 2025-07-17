@@ -16,16 +16,17 @@
 
 ## 可选变量
 
-### GEMINI_MODEL
-- **描述**: 当请求中未指定模型时使用的默认 Gemini 模型
+### GEMINI_MODEL（主要模型配置）
+- **描述**: **这是配置路由器使用哪个 Gemini 模型的主要方式。** 当请求中未指定模型时使用的默认 Gemini 模型
 - **必需**: 否
 - **类型**: 字符串
 - **默认值**: `gemini-2.5-flash`
 - **支持的值**:
   - `gemini-2.5-flash` - 最新快速模型（推荐）
-  - `gemini-1.5-pro` - 高性能模型
+  - `gemini-2.5-pro` - 高性能模型
   - `gemini-1.5-flash` - 快速模型
 - **配置方式**: 在 `wrangler.toml` 的 `[vars]` 部分设置
+- **重要**: 这个 Worker 端配置控制模型选择，而不是本地 shell 环境变量
 
 ## 配置方法
 
@@ -58,7 +59,7 @@ GEMINI_MODEL = "gemini-2.5-flash"
 
 # 生产环境
 [env.production.vars]
-GEMINI_MODEL = "gemini-1.5-pro"
+GEMINI_MODEL = "gemini-2.5-pro"
 ```
 
 ## Claude Code 集成的环境变量
@@ -79,21 +80,11 @@ GEMINI_MODEL = "gemini-1.5-pro"
 - **示例**: `AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 - **配置方式**: 在你的 shell 配置文件中设置（`~/.bashrc` 或 `~/.zshrc`）
 
-### ANTHROPIC_MODEL
-- **描述**: Claude Code 使用的默认模型
-- **必需**: 否
-- **类型**: 字符串
-- **默认值**: 使用 Worker 中的 GEMINI_MODEL 值
-- **示例**: `gemini-2.5-flash`
-- **配置方式**: 在你的 shell 配置文件中设置（`~/.bashrc` 或 `~/.zshrc`）
+### 模型选择
 
-### ANTHROPIC_SMALL_FAST_MODEL
-- **描述**: Claude Code 用于快速操作的小型/快速模型
-- **必需**: 否
-- **类型**: 字符串
-- **默认值**: 使用 Worker 中的 GEMINI_MODEL 值
-- **示例**: `gemini-2.5-flash`
-- **配置方式**: 在你的 shell 配置文件中设置（`~/.bashrc` 或 `~/.zshrc`）
+**重要**: 模型选择由 Worker 端的 `GEMINI_MODEL` 环境变量控制（在 `wrangler.toml` 中配置）。本地 shell 环境变量如 `ANTHROPIC_MODEL` 不会影响使用哪个模型 - 它们会被 claude-gemini-router 忽略。
+
+要更改路由器使用的模型，请更新 Worker 配置中的 `GEMINI_MODEL` 变量（参见上面的"可选变量"部分）。
 
 ## 配置示例
 
@@ -106,19 +97,57 @@ GEMINI_MODEL = "gemini-1.5-pro"
 export ANTHROPIC_BASE_URL="https://cgr.jimmysong.io"
 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
 
-# 可选：指定模型
-export ANTHROPIC_MODEL="gemini-2.5-flash"
-export ANTHROPIC_SMALL_FAST_MODEL="gemini-2.5-flash"
+# 注意：模型选择由 Worker 配置中的 GEMINI_MODEL 控制，
+# 而不是本地 shell 环境变量
 ```
 
 ### 多环境别名
 
 ```bash
 # 通过 claude-gemini-router 使用 Gemini 的别名
-alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" ANTHROPIC_MODEL="gemini-2.5-flash" claude'
+# 注意：模型选择由 Worker 配置中的 GEMINI_MODEL 控制
+alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" claude'
 
 # 官方 Anthropic API 的别名
 alias claude-official='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
+
+# 使用不同 Worker 部署的不同模型
+alias claude-fast='ANTHROPIC_BASE_URL="https://claude-gemini-fast.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-pro='ANTHROPIC_BASE_URL="https://claude-gemini-pro.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+```
+
+### 为不同模型部署多个 Worker
+
+要有效使用不同的 Gemini 模型，请部署不同的 Worker 而不是依赖 shell 变量：
+
+**方法 1：命名部署**
+
+```bash
+# 为不同模型部署不同的 Worker
+wrangler deploy --name claude-gemini-fast
+wrangler deploy --name claude-gemini-pro
+
+# 为每个部署设置 API 密钥
+wrangler secret put GEMINI_API_KEY --name claude-gemini-fast
+wrangler secret put GEMINI_API_KEY --name claude-gemini-pro
+```
+
+**方法 2：基于环境的部署**
+
+```bash
+# 部署到不同环境
+wrangler deploy --env fast
+wrangler deploy --env pro
+```
+
+使用 `wrangler.toml` 配置：
+
+```toml
+[env.fast.vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[env.pro.vars]
+GEMINI_MODEL = "gemini-2.5-pro"
 ```
 
 ### GitHub Actions 配置

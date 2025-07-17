@@ -16,16 +16,17 @@ This document describes the environment variables used by claude-gemini-router.
 
 ## Optional Variables
 
-### GEMINI_MODEL
-- **Description**: Default Gemini model to use when no model is specified in requests
+### GEMINI_MODEL (Primary Model Configuration)
+- **Description**: **This is the primary way to configure which Gemini model the router uses.** Default Gemini model to use when no model is specified in requests
 - **Required**: No
 - **Type**: String
 - **Default**: `gemini-2.5-flash`
 - **Supported values**:
   - `gemini-2.5-flash` - Latest fast model (recommended)
-  - `gemini-1.5-pro` - High-performance model
+  - `gemini-2.5-pro` - High-performance model
   - `gemini-1.5-flash` - Fast model
 - **Configuration**: Set in `wrangler.toml` under `[vars]` section
+- **Important**: This worker-side configuration controls model selection, not local shell environment variables
 
 ## Configuration Methods
 
@@ -58,7 +59,7 @@ GEMINI_MODEL = "gemini-2.5-flash"
 
 # Production environment
 [env.production.vars]
-GEMINI_MODEL = "gemini-1.5-pro"
+GEMINI_MODEL = "gemini-2.5-pro"
 ```
 
 ## Environment Variables for Claude Code Integration
@@ -79,21 +80,11 @@ When using claude-gemini-router with Claude Code, configure these environment va
 - **Example**: `AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 - **Configuration**: Set in your shell config (`~/.bashrc` or `~/.zshrc`)
 
-### ANTHROPIC_MODEL
-- **Description**: Default model for Claude Code to use
-- **Required**: No
-- **Type**: String
-- **Default**: Uses the GEMINI_MODEL value from your Worker
-- **Example**: `gemini-2.5-flash`
-- **Configuration**: Set in your shell config (`~/.bashrc` or `~/.zshrc`)
+### Model Selection
 
-### ANTHROPIC_SMALL_FAST_MODEL
-- **Description**: Small/fast model for Claude Code to use for quick operations
-- **Required**: No
-- **Type**: String
-- **Default**: Uses the GEMINI_MODEL value from your Worker
-- **Example**: `gemini-2.5-flash`
-- **Configuration**: Set in your shell config (`~/.bashrc` or `~/.zshrc`)
+**Important**: Model selection is controlled by the `GEMINI_MODEL` environment variable on the worker side (configured in `wrangler.toml`). Local shell environment variables like `ANTHROPIC_MODEL` do not affect which model is used - they are ignored by the claude-gemini-router.
+
+To change the model used by the router, update the `GEMINI_MODEL` variable in your worker configuration (see the "Optional Variables" section above).
 
 ## Example Configurations
 
@@ -106,19 +97,57 @@ Add to your `~/.bashrc` or `~/.zshrc`:
 export ANTHROPIC_BASE_URL="https://cgr.jimmysong.io"
 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
 
-# Optional: specify models
-export ANTHROPIC_MODEL="gemini-2.5-flash"
-export ANTHROPIC_SMALL_FAST_MODEL="gemini-2.5-flash"
+# Note: Model selection is controlled by GEMINI_MODEL in your worker configuration,
+# not by local shell environment variables
 ```
 
 ### Multiple Environment Aliases
 
 ```bash
 # Alias for Gemini via claude-gemini-router
-alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" ANTHROPIC_MODEL="gemini-2.5-flash" claude'
+# Note: Model selection is controlled by GEMINI_MODEL in your worker configuration
+alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" claude'
 
 # Alias for official Anthropic API
 alias claude-official='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
+
+# For different models using separate worker deployments
+alias claude-fast='ANTHROPIC_BASE_URL="https://claude-gemini-fast.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-pro='ANTHROPIC_BASE_URL="https://claude-gemini-pro.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+```
+
+### Deploying Multiple Workers for Different Models
+
+To use different Gemini models effectively, deploy separate Workers instead of relying on shell variables:
+
+**Method 1: Named Deployments**
+
+```bash
+# Deploy separate workers for different models
+wrangler deploy --name claude-gemini-fast
+wrangler deploy --name claude-gemini-pro
+
+# Set API keys for each deployment
+wrangler secret put GEMINI_API_KEY --name claude-gemini-fast
+wrangler secret put GEMINI_API_KEY --name claude-gemini-pro
+```
+
+**Method 2: Environment-Based Deployments**
+
+```bash
+# Deploy to different environments
+wrangler deploy --env fast
+wrangler deploy --env pro
+```
+
+With `wrangler.toml` configuration:
+
+```toml
+[env.fast.vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[env.pro.vars]
+GEMINI_MODEL = "gemini-2.5-pro"
 ```
 
 ### GitHub Actions Configuration

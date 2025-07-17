@@ -1,5 +1,7 @@
 # claude-gemini-router
 
+[简体中文](README.zh.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange?style=flat&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
@@ -26,13 +28,6 @@ export ANTHROPIC_BASE_URL="https://cgr.jimmysong.io"
 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
 ```
 
-**Optional:** Configure specific models:
-
-```bash
-export ANTHROPIC_MODEL="gemini-2.5-flash"
-export ANTHROPIC_SMALL_FAST_MODEL="gemini-2.5-flash"
-```
-
 **Step 4:** Reload your shell and run Claude Code:
 
 ```bash
@@ -44,15 +39,69 @@ That's it! Claude Code will now use Google Gemini models through claude-gemini-r
 
 ### Multiple Configurations
 
-To maintain multiple Claude Code configurations for different providers or models, use shell aliases:
+To maintain multiple Claude Code configurations for different providers, use shell aliases:
 
 ```bash
 # Example aliases for different configurations
-alias c1='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" ANTHROPIC_MODEL="gemini-2.5-flash" claude'
-alias c2='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
+alias claude-gemini='ANTHROPIC_BASE_URL="https://cgr.jimmysong.io" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-official='ANTHROPIC_BASE_URL="https://api.anthropic.com" ANTHROPIC_API_KEY="your-anthropic-key" claude'
 ```
 
-Add these aliases to your shell config file (`~/.bashrc` or `~/.zshrc`), then use `c1` or `c2` to switch between configurations.
+Add these aliases to your shell config file (`~/.bashrc` or `~/.zshrc`), then use `claude-gemini` or `claude-official` to switch between configurations.
+
+#### Using Different Models with Separate Workers
+
+To use different Gemini models, deploy separate Workers with different configurations instead of relying on shell variables:
+
+**Option 1: Multiple Worker Deployments**
+
+```bash
+# Deploy worker for fast model
+wrangler deploy --name claude-gemini-fast
+wrangler secret put GEMINI_API_KEY --name claude-gemini-fast
+
+# Deploy worker for pro model  
+wrangler deploy --name claude-gemini-pro
+wrangler secret put GEMINI_API_KEY --name claude-gemini-pro
+```
+
+Then configure different `wrangler.toml` files or use environment-specific configurations:
+
+```toml
+# For the fast worker
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# For the pro worker
+[vars]
+GEMINI_MODEL = "gemini-2.5-pro"
+```
+
+**Option 2: Environment-Based Deployment**
+
+```bash
+# Deploy to different environments
+wrangler deploy --env fast
+wrangler deploy --env pro
+```
+
+With corresponding `wrangler.toml` configuration:
+
+```toml
+[env.fast.vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[env.pro.vars]
+GEMINI_MODEL = "gemini-2.5-pro"
+```
+
+Then use aliases to point to different deployments:
+
+```bash
+# Aliases for different model deployments
+alias claude-fast='ANTHROPIC_BASE_URL="https://claude-gemini-fast.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+alias claude-pro='ANTHROPIC_BASE_URL="https://claude-gemini-pro.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+```
 
 ## GitHub Actions Usage
 
@@ -119,8 +168,18 @@ This allows you to use [Claude Code](https://claude.ai/code) with Google's Gemin
 | Model Name | Description |
 |------------|-------------|
 | `gemini-2.5-flash` | Latest fast model (default) |
-| `gemini-1.5-pro` | High-performance model |
+| `gemini-2.5-pro` | High-performance model |
 | `gemini-1.5-flash` | Fast model |
+
+## Model Selection
+
+**The claude-gemini-router supports two valid methods for selecting the Gemini model to use:**
+
+1. **Cloudflare Worker Environment Variable**: The `GEMINI_MODEL` environment variable can be set in your `wrangler.toml` configuration file under the `[vars]` section or as a Cloudflare secret. This variable is intended to serve as a fallback default model, though the current implementation primarily relies on the automatic mapping mechanism below.
+
+2. **Automatic Model Mapping**: The `mapModelToGemini()` function automatically translates Anthropic model names sent by the client into appropriate Gemini model equivalents. When a client sends model names containing "haiku", "sonnet", or "opus", the router intelligently maps them to corresponding Gemini models ("gemini-2.5-flash" for haiku, "gemini-2.5-pro" for sonnet/opus). If the model name already contains a forward slash, it's passed through unchanged. For unrecognized models, it defaults to "gemini-2.5-flash".
+
+**Important**: The client-side `ANTHROPIC_MODEL` environment variable has **no server-side effect** on model selection within the worker itself. While it may be used by client applications (like Claude Code) to specify which model name to send in requests, the actual model selection is handled exclusively by the server-side `mapModelToGemini()` function. This client-side variable should not be advertised as a way to control server-side model selection, as it has no impact on the worker's behavior.
 
 ## API Usage
 
