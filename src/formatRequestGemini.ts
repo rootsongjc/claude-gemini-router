@@ -58,18 +58,23 @@ interface GeminiRequest {
 /**
  * Maps Anthropic model names to Gemini model names
  */
-export function mapModelToGemini(anthropicModel: string): string {
+export function mapModelToGemini(modelName: string): string {
   // If model already contains '/', it might be a full model path
-  if (anthropicModel.includes('/')) {
-    return anthropicModel;
+  if (modelName.includes('/')) {
+    return modelName;
+  }
+  
+  // If it's already a Gemini model name, return it as is
+  if (modelName.startsWith('gemini-')) {
+    return modelName;
   }
   
   // Map common Anthropic models to Gemini equivalents
-  if (anthropicModel.includes('haiku')) {
+  if (modelName.includes('haiku')) {
     return 'gemini-2.5-flash';
-  } else if (anthropicModel.includes('sonnet')) {
+  } else if (modelName.includes('sonnet')) {
     return 'gemini-2.5-pro';
-  } else if (anthropicModel.includes('opus')) {
+  } else if (modelName.includes('opus')) {
     return 'gemini-2.5-pro';
   }
   
@@ -306,8 +311,8 @@ export function formatAnthropicToGemini(body: MessageCreateParamsBase, env?: { G
     geminiRequest.tools = [];
   }
 
-  // Use environment variable model if available, otherwise use request model
-  const selectedModel = env?.GEMINI_MODEL || model;
+  // Use request model if available, otherwise use environment variable model
+  const selectedModel = model || env?.GEMINI_MODEL || 'gemini-2.5-flash';
 
   return {
     request: geminiRequest,
