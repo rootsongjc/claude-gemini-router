@@ -176,6 +176,7 @@ This allows you to use [Claude Code](https://claude.ai/code) with Google's Gemin
 **The claude-gemini-router supports flexible model selection with the following priority order:**
 
 1. **Request Model Parameter** (Highest Priority): The `model` field in the API request takes precedence. You can specify any valid Gemini model name directly:
+
    ```bash
    curl -X POST https://cgr.jimmysong.io/v1/messages \
      -H "Content-Type: application/json" \
