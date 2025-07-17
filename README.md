@@ -51,56 +51,29 @@ Add these aliases to your shell config file (`~/.bashrc` or `~/.zshrc`), then us
 
 #### Using Different Models with Separate Workers
 
-To use different Gemini models, deploy separate Workers with different configurations instead of relying on shell variables:
+For advanced users who want dedicated Workers for different models, see [MULTI_WORKER_DEPLOYMENT.md](./MULTI_WORKER_DEPLOYMENT.md) for detailed instructions.
 
-**Option 1: Multiple Worker Deployments**
+**Quick Example:**
 
 ```bash
-# Deploy worker for fast model
-wrangler deploy --name claude-gemini-fast
-wrangler secret put GEMINI_API_KEY --name claude-gemini-fast
+# Deploy separate workers
+wrangler deploy --name claude-gemini-flash
+wrangler secret put GEMINI_API_KEY --name claude-gemini-flash
+wrangler secret put GEMINI_MODEL --name claude-gemini-flash  # Enter: gemini-2.5-flash
 
-# Deploy worker for pro model  
 wrangler deploy --name claude-gemini-pro
 wrangler secret put GEMINI_API_KEY --name claude-gemini-pro
+wrangler secret put GEMINI_MODEL --name claude-gemini-pro    # Enter: gemini-2.5-pro
 ```
 
-Then configure different `wrangler.toml` files or use environment-specific configurations:
-
-```toml
-# For the fast worker
-[vars]
-GEMINI_MODEL = "gemini-2.5-flash"
-
-# For the pro worker
-[vars]
-GEMINI_MODEL = "gemini-2.5-pro"
-```
-
-**Option 2: Environment-Based Deployment**
+**Alternative: Single Worker with Request-level Model Selection (Recommended)**
 
 ```bash
-# Deploy to different environments
-wrangler deploy --env fast
-wrangler deploy --env pro
-```
-
-With corresponding `wrangler.toml` configuration:
-
-```toml
-[env.fast.vars]
-GEMINI_MODEL = "gemini-2.5-flash"
-
-[env.pro.vars]
-GEMINI_MODEL = "gemini-2.5-pro"
-```
-
-Then use aliases to point to different deployments:
-
-```bash
-# Aliases for different model deployments
-alias claude-fast='ANTHROPIC_BASE_URL="https://claude-gemini-fast.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
-alias claude-pro='ANTHROPIC_BASE_URL="https://claude-gemini-pro.your-subdomain.workers.dev" ANTHROPIC_API_KEY="your-gemini-key" claude'
+# Use different models with the same Worker
+curl -X POST https://cgr.jimmysong.io/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $GEMINI_API_KEY" \
+  -d '{"model": "gemini-1.5-flash", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ## GitHub Actions Usage
@@ -216,6 +189,22 @@ The API response now correctly includes the `model` field showing which model wa
   "usage": {"input_tokens": 4, "output_tokens": 8}
 }
 ```
+
+### Important: Claude Code Environment Variables
+
+**These environment variables DO NOT affect Worker model selection:**
+
+```bash
+# ❌ These will NOT change the model used by the Worker
+export ANTHROPIC_MODEL="gemini-1.5-flash"
+export ANTHROPIC_SMALL_FAST_MODEL="gemini-1.5-flash"
+```
+
+**Why?** The Worker controls model selection server-side, not client-side environment variables.
+
+**To use different models:**
+- Use multiple Workers with different `GEMINI_MODEL` configurations
+- Or specify the model in API requests: `{"model": "gemini-1.5-flash"}`
 
 ## API Usage
 
