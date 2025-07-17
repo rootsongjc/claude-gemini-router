@@ -58,18 +58,23 @@ interface GeminiRequest {
 /**
  * Maps Anthropic model names to Gemini model names
  */
-export function mapModelToGemini(anthropicModel: string): string {
+export function mapModelToGemini(modelName: string): string {
   // If model already contains '/', it might be a full model path
-  if (anthropicModel.includes('/')) {
-    return anthropicModel;
+  if (modelName.includes('/')) {
+    return modelName;
+  }
+  
+  // If it's already a Gemini model name, return it as is
+  if (modelName.startsWith('gemini-')) {
+    return modelName;
   }
   
   // Map common Anthropic models to Gemini equivalents
-  if (anthropicModel.includes('haiku')) {
+  if (modelName.includes('haiku')) {
     return 'gemini-2.5-flash';
-  } else if (anthropicModel.includes('sonnet')) {
+  } else if (modelName.includes('sonnet')) {
     return 'gemini-2.5-pro';
-  } else if (anthropicModel.includes('opus')) {
+  } else if (modelName.includes('opus')) {
     return 'gemini-2.5-pro';
   }
   
@@ -266,7 +271,7 @@ function convertMessagesToGeminiContents(messages: any[], systemPrompt?: string)
 /**
  * Converts Anthropic Claude /v1/messages request to Gemini generateContent format
  */
-export function formatAnthropicToGemini(body: MessageCreateParamsBase): {
+export function formatAnthropicToGemini(body: MessageCreateParamsBase, env?: { GEMINI_MODEL?: string }): {
   request: GeminiRequest;
   isStream: boolean;
   model: string;
@@ -306,10 +311,13 @@ export function formatAnthropicToGemini(body: MessageCreateParamsBase): {
     geminiRequest.tools = [];
   }
 
+  // Use request model if available, otherwise use environment variable model
+  const selectedModel = model || env?.GEMINI_MODEL || 'gemini-2.5-flash';
+
   return {
     request: geminiRequest,
     isStream: stream || false,
-    model: mapModelToGemini(model)
+    model: mapModelToGemini(selectedModel)
   };
 }
 
