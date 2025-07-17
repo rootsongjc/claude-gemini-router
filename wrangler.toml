@@ -1,0 +1,16 @@
+name = "claude-gemini-router"
+main = "src/index.ts"
+compatibility_date = "2023-12-01"
+
+routes = [
+  { pattern = "cgr.jimmysong.io", custom_domain = true }
+]
+
+# Default environment variables
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Enable logging
+[observability]
+enabled = true
+head_sampling_rate = 1
